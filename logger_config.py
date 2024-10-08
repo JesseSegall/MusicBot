@@ -20,6 +20,4 @@ def setup_logger():
 
     return logger
 
-# Usage in other files:
-# from logger_config import setup_logger
-# logger = setup_logger()
+
