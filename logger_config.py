@@ -4,8 +4,10 @@ import logging.handlers
 
 def setup_logger():
     logger = logging.getLogger('discord')
-    logger.setLevel(logging.DEBUG)
-    logging.getLogger('discord.http').setLevel(logging.INFO)
+    logger.setLevel(logging.WARNING)
+
+    logging.getLogger('discord.http').setLevel(logging.WARNING)
+    logging.getLogger('discord.player').setLevel(logging.ERROR)  # Only log errors
 
     handler = logging.handlers.RotatingFileHandler(
         filename='discord.log',
@@ -16,6 +18,7 @@ def setup_logger():
     dt_fmt = '%Y-%m-%d %H:%M:%S'
     formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
     handler.setFormatter(formatter)
+    handler.setLevel(logging.WARNING)  # Set handler level to WARNING
     logger.addHandler(handler)
 
     return logger

@@ -23,11 +23,10 @@ logger.info(f'Current Songs: {current_songs}')
 bot = commands.Bot(command_prefix='$', intents=intents)
 ydl_opts = {
     'format': 'bestaudio/best',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'ytsearch',
+    'source_address': '0.0.0.0',  # Bind to IPv4
 }
 
 
@@ -128,19 +127,6 @@ async def play(ctx, *, song_name):
         logger.warning(f"User {ctx.author} tried to play music without being in a voice channel")
         return
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            info = ydl.extract_info(f'ytsearch:{song_name}', download=False)['entries'][0]
-            url = info['url']
-        except IndexError:
-            await ctx.send(f"Couldn't find any song matching '{song_name}'. Please try a different search term.")
-            logger.warning(f"No song found for search term: {song_name}")
-            return
-        except Exception as e:
-            await ctx.send(f"An error occurred while searching for the song: {str(e)}")
-            logger.error(f"Error searching for song '{song_name}': {str(e)}", exc_info=True)
-            return
-
     if not ctx.voice_client:
         try:
             await ctx.author.voice.channel.connect()
@@ -150,19 +136,41 @@ async def play(ctx, *, song_name):
             logger.error(f"Error connecting to voice channel: {str(e)}", exc_info=True)
             return
 
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(song_name, download=False)
+            if 'entries' in info:
+                info = info['entries'][0]
+            url = info['url']
+            title = info.get('title', 'Unknown Title')
+        except Exception as e:
+            await ctx.send(f"An error occurred while searching for the song: {str(e)}")
+            logger.error(f"Error searching for song '{song_name}': {str(e)}", exc_info=True)
+            return
+
     try:
-        source = discord.FFmpegPCMAudio(url, executable=PATH)
+        ffmpeg_options = {
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -loglevel quiet',
+            'options': '-vn'
+        }
+
+        source =  discord.FFmpegOpusAudio(
+            url,
+            executable=PATH,
+            **ffmpeg_options
+        )
         ctx.voice_client.play(source)
-        await ctx.send(f"Now playing: {info['title']}")
-        logger.info(f"Now playing: {info['title']}")
+        await ctx.send(f"Now playing: {title}")
+        logger.info(f"Now playing: {title}")
         guild_id = ctx.guild.id
         current_songs[guild_id] = {
-            'title': info['title'],
+            'title': title,
             'requester': ctx.author.name,
         }
     except Exception as e:
         await ctx.send(f"An error occurred while trying to play the song: {str(e)}")
         logger.error(f"Error playing song '{song_name}': {str(e)}", exc_info=True)
+
 
 
 bot.run(TOKEN)
