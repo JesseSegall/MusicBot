@@ -1,4 +1,5 @@
 from sys import exc_info
+from collections import deque
 import asyncio
 from logger_config import setup_logger
 import discord
@@ -86,11 +87,12 @@ async def song(ctx):
         await ctx.send("There is no song currently playing.")
 
 
+
 @bot.command()
 async def stop(ctx):
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if ctx.voice_client and ctx.voice_client.is_playing() or ctx.voice_client.is_paused():
         ctx.voice_client.stop()
-        current_song = current_songs.pop(ctx.guild.id, None)
+        current_song = current_songs.get(ctx.guild.id)
         song_title = current_song['title'] if current_song else 'Unknown'
         await ctx.send(f'Stopped playing {song_title}')
         logger.info(f'Stopped playing: {song_title}')
@@ -154,23 +156,33 @@ async def play(ctx, *, song_name):
             'options': '-vn'
         }
 
-        source =  discord.FFmpegOpusAudio(
+        source = discord.FFmpegOpusAudio(
             url,
             executable=PATH,
             **ffmpeg_options
         )
-        ctx.voice_client.play(source)
-        await ctx.send(f"Now playing: {title}")
-        logger.info(f"Now playing: {title}")
+
         guild_id = ctx.guild.id
         current_songs[guild_id] = {
             'title': title,
             'requester': ctx.author.name,
         }
+
+        def after_playing(error):
+            if error:
+                logger.error(f"Error in after_playing: {error}")
+            else:
+
+                del current_songs[guild_id]
+                logger.info(f"Song has been removed from current_songs: {current_songs}")
+
+        ctx.voice_client.play(source, after=after_playing)
+        await ctx.send(f"Now playing: {title}")
+        logger.info(f"Now playing: {title}")
+
     except Exception as e:
         await ctx.send(f"An error occurred while trying to play the song: {str(e)}")
         logger.error(f"Error playing song '{song_name}': {str(e)}", exc_info=True)
-
 
 
 bot.run(TOKEN)

@@ -4,7 +4,7 @@ import logging.handlers
 
 def setup_logger():
     logger = logging.getLogger('discord')
-    logger.setLevel(logging.WARNING)
+    logger.setLevel(logging.INFO)
 
     logging.getLogger('discord.http').setLevel(logging.WARNING)
     logging.getLogger('discord.player').setLevel(logging.ERROR)  # Only log errors
